@@ -1,0 +1,45 @@
+# PROJECT SCOPE 
+
+Must haves: 
+
+  Containers
+  
+    device_vector 
+    device_vector_compact 
+    device_map 
+    device_unordered_map 
+    device_set
+    device_unordered_set
+    device_array 
+
+  Memory
+    
+    device_allocator 
+    device_unique_ptr
+    device_shared_ptr
+    
+  Algorithm 
+    
+    device_copy
+    device_sort
+    
+  
+Should haves: 
+
+  Containers
+     device_list 
+     device_stack
+     device_queue 
+
+  Memory
+     device_weak_ptr
+
+  Algorithm 
+     device_find
+     device_count
+     device_count_if
+
+  Parallel Algorithm
+     device_parallel_sort
+     device_parallel_equal 
+     
