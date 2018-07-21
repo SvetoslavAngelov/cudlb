@@ -8,12 +8,12 @@ namespace cudlb
 	template <typename T>
 	class device_allocator {
 	public:
-		using value_type = T;
-		using pointer = T*;
-		using const_pointer = T const*;
-		using reference = T&;
-		using const_reference = T const&;
-		using size_type = size_t;
+		using value_type =				T;
+		using pointer =					T*;
+		using const_pointer =			T const*;
+		using reference =				T&;
+		using const_reference =			T const&;
+		using size_type =				size_t;
 
 		/**
 			Constructors.
@@ -65,22 +65,18 @@ namespace cudlb
 		__device__
 		void deallocate(pointer p, size_type n)
 		{
-			if (p)
-				::operator delete(p, (n * sizeof(value_type)));
+			::operator delete(p, (n * sizeof(value_type)));
  		}
 
 		/**
 			Constructs an object T with value/s args in location p. 
 			NOTE: object construction and destruction does not affect allocated space.
-			TODO Test. Function uses perfect fowarding for unwarpping argument lists.
-						This should minimuse the need for temporary object construction/destruction. 
-						***Should*** 
 		*/
 		template<typename... Arg>
 		__device__
 		void construct(pointer p, Arg &&... args)
 		{
-			new(static_cast<void*>(p))T(std::forward<Arg>(args)...);
+			new(p)T(std::forward<Arg>(args)...);
 		}
 
 		/**
