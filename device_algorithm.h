@@ -1,5 +1,6 @@
 #pragma once
 #include <utility>
+#include "device_allocator.h"
 
 
 namespace cudlb
@@ -11,7 +12,7 @@ namespace cudlb
 	*/
 	template<typename In, typename Out>
 	__host__ __device__
-	Out device_copy(In iterator_first, In iterator_last, Out result)
+	Out copy(In iterator_first, In iterator_last, Out result)
 	{
 		while (iterator_first != iterator_last)
 		{
@@ -25,7 +26,7 @@ namespace cudlb
 
 	template<typename T> 
 	__host__ __device__
-	void device_swap(T& first, T& second)
+	void swap(T& first, T& second)
 	{
 		T temp = std::move(first);
 		first = std::move(second);

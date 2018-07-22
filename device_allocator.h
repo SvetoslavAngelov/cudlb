@@ -8,12 +8,12 @@ namespace cudlb
 	template <typename T>
 	class device_allocator {
 	public:
-		using value_type =				T;
-		using pointer =					T*;
-		using const_pointer =			T const*;
-		using reference =				T&;
-		using const_reference =			T const&;
-		using size_type =				size_t;
+		using value_type = T;
+		using pointer =	T*;
+		using const_pointer = T const*;
+		using reference = T&;
+		using const_reference =	T const&;
+		using size_type = size_t;
 
 		/**
 			Constructors.
@@ -65,7 +65,8 @@ namespace cudlb
 		__device__
 		void deallocate(pointer p, size_type n)
 		{
-			::operator delete(p, (n * sizeof(value_type)));
+			if(p) // TODO is check necessary? 
+				::operator delete(p, (n * sizeof(value_type)));
  		}
 
 		/**
