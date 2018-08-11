@@ -8,304 +8,223 @@
 namespace cudlb
 {
 	template<typename T, typename Allocator = cudlb::device_allocator<T>>
-	struct device_vector_base {
-	public:
+	struct vector_base {
 		using value_type = T;
-		using pointer = T*;
-		using const_pointer = T const*;
+		using iterator = T*;
+		using const_iterator = T const*;
 		using reference = T&;
 		using const_reference = T const&;
 		using size_type = size_t;
 
 		/**
-			Constructors.
+		*	Vector base implementation 
+		*/
+		struct vector_impl{
+
+			/**
+			*	Default empty constructor. 
+			*	Allocator class is stateless, initialization not required in this case. 
+			*	Destructor for this implementation is not required, none of the constructors allocate space.
+			*/
+			__device__
+			vector_impl()
+				: begin{ nullptr }, end{ nullptr }, space{ nullptr } {}
+
+			/**
+			*	Default empty constructor taking a new Allocator object. 
+			*/
+			__device__
+			explicit vector_impl(Allocator const& other)
+				: alloc{ other }, begin{ nullptr }, end{ nullptr }, space{ nullptr } {}
+
+
+			Allocator alloc; 
+			iterator begin;
+			iterator end; 
+			iterator space; 
+		};
+
+		/**
+		*	Default empty constructor.
 		*/
 		__device__
-		device_vector_base()
-			: space{ 0 }, sz{ 0 }, elem{ nullptr }
-		{}
+		vector_base()
+			: base{} {}
 
+		/**
+		*	Default empty constructor, taking a new Allocator object.
+		*/
 		__device__
-		explicit device_vector_base(size_type const n)
-			: space{ n }, sz{ n }, elem{ alloc.allocate(n) }
-		{
-			for (size_type i{ 0 }; i < n; ++i)
-				alloc.construct(&elem[i], value_type());
-		}
+		explicit vector_base(Allocator const& other)
+			: base{ other } {}
 
+		/**
+		*	Allocates space for n number of objects of type T
+		*	NOTE: Allocated space is uninitialized. 
+		*/
 		__device__
-		device_vector_base(Allocator const& a, size_type const n)
-			: alloc{ a }, space{ n }, sz{ n }
+		explicit vector_base(size_type const n)
+			: base{}
 		{
-			elem = alloc.allocate(n);
-			for (size_type i{ 0 }; i < n; ++i)
-				alloc.construct(&elem[i], value_type());
+			allocate_space(n);
 		}
 
 		/**
-			TODO
+		*	Allocates space for n number of objects of type T. 
+		*	Space is allocated using a new Allocator object. 
+		*	NOTE: Allocated space is uninitialized.
 		*/
-		/*__device__
-		device_vector_base(std::initializer_list<T> const lst) 
-			: space{ lst.size() }, sz{ lst.size() }, elem{ alloc.allocate(lst.size()) }
-		{
-			
-		}*/
-
 		__device__
-		device_vector_base(device_vector_base const& other)
-			: alloc{ other.alloc }, space{ other.space }, sz{ other.sz }
+		vector_base(Allocator const& other, size_type const n)
+			: base{ other }
 		{
-			elem = alloc.allocate(other.space);
-			for (size_type i{ 0 }; i < sz; ++i)
-				alloc.construct(&elem[i], other.elem[i]);
-		}
-
-		__device__
-		device_vector_base(device_vector_base && other)
-			: alloc{ other.alloc }, space{ other.space }, sz{ other.sz }, elem{ other.elem }
-		{
-			other.elem = nullptr;
-			other.space = 0;
-			other.sz = 0;
+			allocate_space(n);
 		}
 
 		/**
-			Destructor
+		*	Returns allocated space to system.
+		*	NOTE: This function does NOT call object destructors. 
+		*	The responsibility of object construction/destruction is down to device_vector. 
 		*/
 		__device__
-		virtual ~device_vector_base()
+		~vector_base()
 		{
-			for (size_type i{ 0 }; i < sz; ++i)
-				alloc.destroy(&elem[i]);
-			alloc.deallocate(elem, space);
+			deallocate_space();
 		}
 
 		/**
-			Copy assignment operator.
-			// TODO both the copy assignment and move assignment don't take a different allocator into consideration!
+		*	Allocates space for n number of objects of type T. 
+		*	Return a pointer to the start of the allocated memory location.
 		*/
 		__device__
-		device_vector_base& operator=(device_vector_base const& other)
+		void allocate_space(size_type const n)
 		{
-			pointer temp = alloc.allocate(other.sz);
-			for (size_type i{ 0 }; i < other.sz; ++i)
-				alloc.construct(&temp[i], other.elem[i]);
-			for (size_type i{ 0 }; i < sz; ++i)
-				alloc.destroy(&elem[i]);
-			alloc.deallocate(elem, space);
-			elem = temp; 
-			alloc = other.alloc;
-			space = sz = other.sz; 
-			return *this; 
+			base.begin = base.alloc.allocate(n);
+			if (base.begin)
+				base.space = base.end = base.begin + n;
 		}
 
 		/**
-			Move assignment operator.
+		*	Returns allocated space to system. 
 		*/
 		__device__
-		device_vector_base& operator=(device_vector_base && other)
+		void deallocate_space()
 		{
-			for (size_type i{ 0 }; i < sz; ++i) // Destroy elements in current vector
-				alloc.destroy(&elem[i]);
-			alloc.deallocate(elem, space); // Deallocate space of current vector
-			space = sz = other.sz; 
-			elem = other.elem; // Take address of other vector 
-			other.elem = nullptr; 
-			other.space = other.sz = 0; 
-			return *this;
+			// Result of pointer arithmetic must be unsigned number	
+			size_type number_of_elements = static_cast<size_type>(base.space - base.begin); 
+			base.alloc.deallocate(base.begin, number_of_elements);
+			base.space = base.end = nullptr; 
 		}
 
-
-		Allocator alloc; // Memory allocator. Default is cudlb::device_allocator<T>. 
-		size_type space; // Total space in memory reserved for the vector.
-		size_type sz; // Number of elements currently stored in the vector. 
-		pointer elem; // Pointer to first element of type T in a sequence. 
-
+		/**
+		* Data members
+		*/
+		vector_impl base; 
 	};
 
 	template<typename T, typename Allocator = cudlb::device_allocator<T>>
-	class device_vector : private cudlb::device_vector_base<T, Allocator> {
+	class device_vector : private vector_base<T, Allocator>{
 	public:
 		using value_type = T;
-		using pointer =	T*;
-		using const_pointer = T const*;
+		using iterator = T * ;
+		using const_iterator = T const*;
 		using reference = T & ;
 		using const_reference = T const&;
 		using size_type = size_t;
-		using Parent = device_vector_base;
 
 		/**
-			Constructors.
+		*	Default empty constructor.
 		*/
-
 		__device__
 		device_vector()
-			: Parent() {}
-
-		__device__
-		explicit device_vector(size_type const n)
-			: Parent{ n } {}
-
-		__device__
-		device_vector(Allocator const& a, size_type const n)
-			: Parent{ a, n } {}
-
-		/*__device__
-		device_vector(std::initializer_list<T> const lst)
-			: Parent{ lst } {}*/
-
-		__device__
-		device_vector(device_vector const& other)
-			: Parent{ other } {}
-
-		__device__
-		device_vector(device_vector && other)
-			: Parent{ std::move(other) } {}
+			: vector_base{} {}
 
 		/**
-			Destructor.
+		*	Constructs a vector of n number of objects.
+		*	Each object in the device vector is initialized to to their default value.
+		*	Caller can specify the default initialization value val.
 		*/
 		__device__
-		~device_vector() {}
+		explicit device_vector(size_type const n, value_type val = value_type{})
+			: vector_base{ n }
+		{
+			default_fill(val);
+		}
 
 		/**
-			Copy assignment operator. 
+		*	Creates a device_vector of size n, with a new Allocator object.
+		*	Each object in the device vector is initialized to to their default value.
+		*	Caller can specify the default initialization value val.
+		*/
+		__device__
+		device_vector(Allocator const& other, size_type const n, value_type val = value_type{})
+			: vector_base{ other, n }
+		{
+			default_fill(val);
+		}
+
+		/**
+		*	Creates a device_vector from an initializer list. 
+		*	Each object in the device vector is initialized to the corresponding value of the initializer list. 
 		*/
 		__device__ 
-		device_vector& operator=(device_vector const& other)
+		device_vector(std::initializer_list<T> list)
+			: vector_base{ list.size() }
 		{
-			Parent::operator=(other);
-			return *this;
+			cudlb::uninitialized_copy(list.begin(), list.end(), this->base.begin);
 		}
 
 		/**
-			Move assignment operator.
+		*	Object destructor.
+		*	NOTE: If elements are pointers, this destructor does not clean up the objects pointed to by them
 		*/
 		__device__
-		device_vector& operator=(device_vector && other)
+		~device_vector()
 		{
-			Parent::operator=(std::move(other));
-			return *this; 
+			destroy_elements();
 		}
 
 		/**
-			Read/write access operator. Does not offer range checking.
+		*	Returns a constant iterator to the first object in the device vector sequence. 
 		*/
 		__device__
-		reference operator[](size_type const n)
+		const_iterator begin() const
 		{
-			return this->elem[n];
+			return this->base.begin;
 		}
 
 		/**
-			Read only access operator. Does not offer range checking.
+		*	Returns a constant iterator to one past the last object in the device vector sequence.
 		*/
 		__device__
-		const_reference operator[](size_type const n) const
+		const_iterator end() const
 		{
-			return this->elem[n];
+			return this->base.end;
+		}
+
+	private: 
+		/**
+		*	Fills the pre-allocated device vector space with a default value. 
+		*	NOTE: This function constructs objects in the pre-allocated space. 
+		*/
+		__device__	
+		void default_fill(value_type value)
+		{
+			for (; this->base.begin != this->base.end; ++this->base.begin)
+				this->base.alloc.construct(this->base.begin, value);
 		}
 
 		/**
-			Reserves space for n number of T type objects.
+		*	Calls each of the objects' destructors in the sequence.
+		*	If objects are pointers, then the objects pointed by the pointers are not cleaned up. 
+		*	You must manually delete them. 
 		*/
 		__device__
-		void reserve(size_type const n)
+		void destroy_elements()
 		{
-			if (n >= this->space)
-			{
-				Parent temp{ this->alloc, n }; // Create a temporary vector, with new allocation, in case new allocation throws. 
-				cudlb::copy(this->begin(), this->end(), temp.elem); // Copy existing objects to temporary.
-				cudlb::swap<Parent>(*this, temp); // Swap with temprary, temporary vector gets destroyed at end of function scope.
-			}
+			for (; this->base.begin != this->base.end; ++this->base.begin)
+				this->base.alloc.destroy(this->base.begin);
 		}
-
-		/**
-			Adds new value to the vector.
-		*/
-		__device__
-		void push_back(const_reference val)
-		{
-			if (this->sz == 0) reserve(4); // TODO. Currently hardcoded to start with space for 4 elements. Replace with a function.
-			else if (this->sz == this->space) 
-				reserve(this->space * 2); // TODO. If no space for new elements create new allocation with twice the space.   
-			this->alloc.construct(&this->elem[this->sz], val); // Construct new object with value val in empty space.
-			++this->sz; // Increase vector size.
-		}
-
-		/**
-			Changes the size of the vector. 
-			If size is bigger than current allocation, it allows the user to provide value for extra elements. 
-			Otherwise they are instantiated with their default value. 
-		*/
-		__device__
-		void resize(size_type const newsize, value_type const val = value_type())
-		{
-			reserve(newsize); // Reserve space for new elements, only if newsize > current vector size. See definiton of reserve().
-			for (size_type i{ 0 }; i < newsize; ++i) 
-				this->alloc.construct(&this->elem[i], val); // Construct objects in new space.
-			for (size_type i = newsize; i < this->sz; ++i) 
-				this->alloc.destroy(&this->elem[i]); // Destroy extra elements.
-			this->sz = this->space = newsize; 
-		}
-
-		/**
-			Erases all elements in the vector. 
-			Does not change the allocation size. 
-		*/
-		__device__
-		void erase()
-		{
-			for (size_type i{ 0 }; i < sz; ++i)
-				this->alloc.destroy(&this->elem[i]);
-			this->sz = 0; 
-		}
-
-		/**
-			Returns the size of the vector.
-		*/
-		__device__
-		size_type size() const
-		{
-			return this->sz; 
-		}
-
-		/**
-			Returns the number of objects that can be added to the current allocation.
-		*/
-		__device__
-		size_type capacity() const
-		{
-			return this->space;
-		}
-
-		/**
-			Checks if vector is empty (no elements). 
-		*/
-		__device__
-		bool empty() const
-		{
-			return begin() == end();
-		}
-
-		/**
-			Returns a read only pointer to first object in the sequence.
-		*/
-		__device__
-		const_pointer begin() const
-		{
-			return this->elem; // 
-		}
-
-		/**
-			Returns a read only pointer to one past the last object in the sequence.
-		*/
-		__device__
-		const_pointer end() const
-		{
-			return &this->elem[this->sz]; 
-		}
-
 	};
 }
+

@@ -16,7 +16,7 @@ namespace cudlb
 		using size_type = size_t;
 
 		/**
-			Constructors.
+		*	Constructors
 		*/
 		__device__
 		explicit device_allocator() {}
@@ -25,33 +25,33 @@ namespace cudlb
 		explicit device_allocator(device_allocator const&) {}
 
 		/**
-			Allows conversion from device_allocator<T> to device_allocator<U>.
+		*	Allows conversion from device_allocator<T> to device_allocator<U>.
 		*/
 		template<typename U>
 		__device__
 		explicit device_allocator(device_allocator<U> const&) {}
 
 		/**
-			Destructor
+		*	Destructor
 		*/
 		__device__
 		~device_allocator() {}
 
 		/**
-			Returns address of allocation.
+		*	 Returns address of allocation.
 		*/
 		__device__
 		pointer address(reference r) { return &r; }
 
 		/**
-			Returns read only address of allocation.
+		*	 Returns read only address of allocation.
 		*/
 		__device__
 		const_pointer address(const_reference r) { return &r; }
 
 
 		/**
-			Allocates space for n objects of type T.
+		*	Allocates space for n objects of type T.
 		*/
 		__device__
 		pointer allocate(size_type const n)
@@ -60,41 +60,45 @@ namespace cudlb
 		}
 
 		/**
-			Deallocates space for n objects of type T.
+		*	Deallocates space for n objects of type T.
 		*/
 		__device__
 		void deallocate(pointer p, size_type n)
 		{
-			if(p) // TODO is check necessary? 
+			if(p)
 				::operator delete(p, (n * sizeof(value_type)));
  		}
 
 		/**
-			Constructs an object T with value/s args in location p. 
-			NOTE: object construction and destruction does not affect allocated space.
+		*	Constructs an object T with value/s args in location p. 
+		*	NOTE: object construction and destruction does not affect allocated space.
 		*/
 		template<typename... Arg>
 		__device__
 		void construct(pointer p, Arg &&... args)
 		{
-			new(p)T(std::forward<Arg>(args)...);
+			::new(static_cast<void*>(p))T(std::forward<Arg>(args)...);
 		}
 
 		/**
-			Destroys object T in p. 
-			NOTE: object construction and destruction does not affect allocated space.
+		*	Destroys object T in p. 
+		*	NOTE: object construction and destruction does not affect allocated space.
 		*/
 		__device__
 		void destroy(pointer p)
 		{
-			p->~T();
+			static_cast<T*>(p)->~T();
 		}
 
+		/*
+		*	Comparison operators 
+		*/
+		__device__
+		bool operator==(device_allocator const&) { return true; }
+
+		__device__ 
+		bool operator!=(device_allocator const& other) { return !(operator==(other)); }
+
 		// TODO Add max size check for T.
-
-		// TODO Add comparison operrator.
 	};
-
-	
-
 }
