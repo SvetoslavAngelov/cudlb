@@ -94,7 +94,6 @@ namespace cudlb
 
 		/**
 		*	Allocates space for n number of objects of type T. 
-		*	Return a pointer to the start of the allocated memory location.
 		*/
 		__device__
 		void allocate_space(size_type const n)
@@ -117,7 +116,7 @@ namespace cudlb
 		}
 
 		/**
-		* Data members
+		*	Data members
 		*/
 		vector_impl base; 
 	};
@@ -131,6 +130,7 @@ namespace cudlb
 		using reference = T & ;
 		using const_reference = T const&;
 		using size_type = size_t;
+		using allocator = typename Allocator; 
 
 		/**
 		*	Default empty constructor.
@@ -175,13 +175,110 @@ namespace cudlb
 		}
 
 		/**
+		*	Copy constructor. 
+		*	Takes another object and creates a copy, including allocation policy. 
+		*/
+		__device__
+		device_vector(device_vector const& other)
+			: vector_base{ other::allocator, other.size() }
+		{
+			cudlb::uninitialized_copy(other.begin(), other.end(), this->base.begin);
+		}
+
+		/**
+		*	Move constructor.
+		*	Doesn't copy allocator object. 
+		*/
+		__device__ 
+		device_vector(device_vector && other)
+			: vector_base{ other::allocator }
+		{
+			this->base.begin = other.base.begin; 
+			this->base.end = other.base.end; 
+			this->base.space = other.base.space; 
+
+			other.base.space = other.base.end = other.base.begin = nullptr; 
+		}
+
+		/**
+		*	Copy assignment operator.
+		*	TODO Rewrite with strong guarantee. 
+		*/
+		__device__
+		device_vector const& operator=(device_vector const& other)
+		{
+			if (other.size() < capacity())
+			{
+				destroy_elements();
+				cudlb::uninitialized_copy(other.begin(), other.end(), this->base.begin);
+			}
+			else
+			{
+				destroy_elements();
+				this->deallocate_space(); 
+				this->allocate_space(other.size());
+				cudlb::uninitialized_copy(other.begin(), other.end(), this->base.begin);
+			}
+			return *this; 
+		}
+
+		/**
+		*	Move assingment operator. 
+		*/
+		__device__ 
+		device_vector const& operator=(device_vector && other)
+		{
+			destroy_elements(); 
+			this->deallocate_space();
+			this->base.begin = other.base.begin;
+			this->base.end = other.base.end;
+			this->base.space = other.base.space;
+			other.base.space = other.base.end = other.base.begin = nullptr;
+			return *this; 
+		}
+
+		/**
 		*	Object destructor.
-		*	NOTE: If elements are pointers, this destructor does not clean up the objects pointed to by them
+		*	NOTE: If elements are pointers, this destructor does not clean up the objects pointed to by them.
+		*	This destructor only calls the object destructor, does not deallocate space.
 		*/
 		__device__
 		~device_vector()
 		{
 			destroy_elements();
+		}
+
+		/** 
+		*	
+		*/
+		void reserve(size_type const n)
+		{
+			if (n > this->base.space) 
+			{
+				device_vector<T, Allocator> temp{ this->base.alloc,  n }; // Allocate new space and initialize to default 
+				//TODO It would be better to allocate space without initializing to default. Perhaps creating a vector base would be better,
+				// but then I'd have to implement a copy constructor/copy assignment/move constructor/move assignment for it due to the call to swap. 
+				cudlb::copy(begin(), end(), temp.base.begin); // Copy existing elements to temp device vector object.
+				cudlb::swap(*this, temp); // Swaps temp object with host object, old host allocation is destroyed at function end. 
+			}
+		}
+
+		/**
+		*	Returns the number of elements the device vector currently holds. 
+		*/
+		__device__
+		size_type size() const
+		{
+			return static_cast<size_type>(this->base.end - this->base.begin);
+		}
+
+		/**
+		*	Returns the number of elements the device vector currently has space for. 
+		*/
+		__device__
+		size_type capacity() const
+		{
+			return static_cast<size_type>(this->base.space - this->base.begin);
 		}
 
 		/**
@@ -200,7 +297,7 @@ namespace cudlb
 		const_iterator end() const
 		{
 			return this->base.end;
-		}
+		}	 		
 
 	private: 
 		/**
