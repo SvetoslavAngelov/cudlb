@@ -187,52 +187,46 @@ namespace cudlb
 
 		/**
 		*	Move constructor.
-		*	Doesn't copy allocator object. 
 		*/
 		__device__ 
 		device_vector(device_vector && other)
 			: vector_base{ other::allocator }
 		{
-			this->base.begin = other.base.begin; 
-			this->base.end = other.base.end; 
-			this->base.space = other.base.space; 
-
+			impl_shallow_copy(other); 
 			other.base.space = other.base.end = other.base.begin = nullptr; 
 		}
 
 		/**
 		*	Copy assignment operator.
-		*	TODO Rewrite with strong guarantee. 
 		*/
 		__device__
 		device_vector const& operator=(device_vector const& other)
 		{
 			if (other.size() < capacity())
 			{
-				destroy_elements();
+				destroy_elements(); 
 				cudlb::uninitialized_copy(other.begin(), other.end(), this->base.begin);
+				this->base.space = this->base.end = this->base.begin + other.size(); 
 			}
 			else
 			{
-				destroy_elements();
-				this->deallocate_space(); 
-				this->allocate_space(other.size());
-				cudlb::uninitialized_copy(other.begin(), other.end(), this->base.begin);
+				vector_base<T, Allocator> temp{ other.size() };
+				cudlb::uninitialized_copy(other.begin(), other.end(), temp.base.begin);
+				swap(*this, temp);
 			}
 			return *this; 
 		}
 
 		/**
 		*	Move assingment operator. 
+		*	TODO add strong guarantee.
 		*/
 		__device__ 
 		device_vector const& operator=(device_vector && other)
 		{
 			destroy_elements(); 
 			this->deallocate_space();
-			this->base.begin = other.base.begin;
-			this->base.end = other.base.end;
-			this->base.space = other.base.space;
+			impl_shallow_copy(other);
 			other.base.space = other.base.end = other.base.begin = nullptr;
 			return *this; 
 		}
@@ -251,15 +245,12 @@ namespace cudlb
 		/** 
 		*	
 		*/
+		__device__
 		void reserve(size_type const n)
 		{
-			if (n > this->base.space) 
+			if (this->base.space < n) 
 			{
-				device_vector<T, Allocator> temp{ this->base.alloc,  n }; // Allocate new space and initialize to default 
-				//TODO It would be better to allocate space without initializing to default. Perhaps creating a vector base would be better,
-				// but then I'd have to implement a copy constructor/copy assignment/move constructor/move assignment for it due to the call to swap. 
-				cudlb::copy(begin(), end(), temp.base.begin); // Copy existing elements to temp device vector object.
-				cudlb::swap(*this, temp); // Swaps temp object with host object, old host allocation is destroyed at function end. 
+				// TODO 
 			}
 		}
 
@@ -305,7 +296,7 @@ namespace cudlb
 		*	NOTE: This function constructs objects in the pre-allocated space. 
 		*/
 		__device__	
-		void default_fill(value_type value)
+		void default_fill(value_type const& value)
 		{
 			for (; this->base.begin != this->base.end; ++this->base.begin)
 				this->base.alloc.construct(this->base.begin, value);
@@ -322,6 +313,31 @@ namespace cudlb
 			for (; this->base.begin != this->base.end; ++this->base.begin)
 				this->base.alloc.destroy(this->base.begin);
 		}
+
+
+		/**
+		*	Specialisation of the cudlb::swap function a vector_base
+		*	It swaps correctly the begin and space pointers, without affecting the end pointer
+		*/
+		__device__
+		void swap(vector_base & first, vector_base & second)
+		{
+			using cudlb::swap;
+			swap(first.base.begin, second.base.begin);
+			swap(first.base.space, second.base.space);
+		}
+
+		/**
+		*	Shallow copy the elements from another device_vector object
+		*/
+		__device__
+		void impl_shallow_copy(device_vector & other)
+		{
+			this->base.begin = other.base.begin;
+			this->base.end = other.base.end;
+			this->base.space = other.base.space;
+		}
+
 	};
 }
 
