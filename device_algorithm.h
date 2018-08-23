@@ -1,6 +1,6 @@
 #pragma once
-#include <utility>
-#include "device_iterator_traits.h"
+#include "device_utility.h"
+#include "device_type_traits.h"
 
 
 
@@ -52,11 +52,8 @@ namespace cudlb
 	__host__ __device__
 	void swap(T& first, T& second)
 	{
-		T temp = std::move(first);
-		first = std::move(second);
-		second = std::move(temp);
+		T temp = cudlb::move(first);
+		first = cudlb::move(second);
+		second = cudlb::move(temp);
 	}
-
-	// TODO add range checked version 
-
 }

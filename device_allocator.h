@@ -1,5 +1,5 @@
 #pragma once 
-#include <utility>
+#include "device_utility.h"
 
 
 
@@ -77,7 +77,7 @@ namespace cudlb
 		__device__
 		void construct(pointer p, Arg &&... args)
 		{
-			::new(static_cast<void*>(p))T(std::forward<Arg>(args)...);
+			::new(static_cast<void*>(p))T(cudlb::forward<Arg>(args)...);
 		}
 
 		/**

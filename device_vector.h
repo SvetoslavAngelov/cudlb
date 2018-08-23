@@ -202,18 +202,7 @@ namespace cudlb
 		__device__
 		device_vector const& operator=(device_vector const& other)
 		{
-			if (other.size() < capacity())
-			{
-				destroy_elements(); 
-				cudlb::uninitialized_copy(other.begin(), other.end(), this->base.begin);
-				this->base.space = this->base.end = this->base.begin + other.size(); 
-			}
-			else
-			{
-				vector_base<T, Allocator> temp{ other.size() };
-				cudlb::uninitialized_copy(other.begin(), other.end(), temp.base.begin);
-				swap(*this, temp);
-			}
+			
 			return *this; 
 		}
 
