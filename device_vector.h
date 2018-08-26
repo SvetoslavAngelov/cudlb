@@ -32,16 +32,17 @@ namespace cudlb
 
 			/**
 			*	Default empty constructor taking a new Allocator object. 
+			*	@other - user specified allocator object.
 			*/
 			__device__
 			explicit vector_impl(Allocator const& other)
 				: alloc{ other }, begin{ nullptr }, end{ nullptr }, space{ nullptr } {}
 
 
-			Allocator alloc; 
-			iterator begin;
-			iterator end; 
-			iterator space; 
+			Allocator alloc; // Memory allocator object.
+			iterator begin;	// Beginning of array of elements. 
+			iterator end;	// One past the last initialized element in the array. 
+			iterator space; // One past the total space in memory allocated for the vector object. 
 		};
 
 		/**
@@ -53,13 +54,15 @@ namespace cudlb
 
 		/**
 		*	Default empty constructor, taking a new Allocator object.
+		*	@other - user specified allocator object.
 		*/
 		__device__
 		explicit vector_base(Allocator const& other)
 			: base{ other } {}
 
 		/**
-		*	Allocates space for n number of objects of type T
+		*	Allocates space for objects of type T. 
+		*	@n - number of objects of type T to allocate space for. 
 		*	NOTE: Allocated space is uninitialized. 
 		*/
 		__device__
@@ -70,8 +73,9 @@ namespace cudlb
 		}
 
 		/**
-		*	Allocates space for n number of objects of type T. 
-		*	Space is allocated using a new Allocator object. 
+		*	Allocates space for objects of type T, using a user specified allocator object. 
+		*	@other - user specified allocator object.
+		*	@n - number of objects of type T to allocate space for. 
 		*	NOTE: Allocated space is uninitialized.
 		*/
 		__device__
@@ -93,7 +97,8 @@ namespace cudlb
 		}
 
 		/**
-		*	Allocates space for n number of objects of type T. 
+		*	Allocates space for objects of type T. 
+		*	@n - number of objects of type T to allocate space for.
 		*/
 		__device__
 		void allocate_space(size_type const n)
@@ -140,53 +145,81 @@ namespace cudlb
 			: vector_base{} {}
 
 		/**
-		*	Constructs a vector of n number of objects.
-		*	Each object in the device vector is initialized to to their default value.
-		*	Caller can specify the default initialization value val.
+		*	Constructs a vector with a user specified number of objects.
+		*	Each object in the vector is initialized to to their default value.
+		*	@n - number of objects of type T to create.
 		*/
 		__device__
-		explicit device_vector(size_type const n, value_type val = value_type{})
+		explicit device_vector(size_type const n)
 			: vector_base{ n }
 		{
-			default_fill(val);
+			default_fill(this->base.begin, this->base.end);
 		}
 
 		/**
-		*	Creates a device_vector of size n, with a new Allocator object.
-		*	Each object in the device vector is initialized to to their default value.
-		*	Caller can specify the default initialization value val.
+		*	Constructs a vector with a user specified number of objects and value.
+		*	@n - number of objects of type T to create. 
+		*	@val - default value of created objects. 
 		*/
 		__device__
-		device_vector(Allocator const& other, size_type const n, value_type val = value_type{})
-			: vector_base{ other, n }
+		device_vector(size_type const n, value_type const& val)
+			: vector_base{ n }
 		{
-			default_fill(val);
+			default_fill(this->base.begin, this->base.end, val);
 		}
 
 		/**
-		*	Creates a device_vector from an initializer list. 
-		*	Each object in the device vector is initialized to the corresponding value of the initializer list. 
+		*	Constructs a vector with a user specified number of objects and allocation policy.
+		*	Each object in the vector is initialized to their default value.
+		*	@other - user specified allocator object.
+		*	@n - number of objects of type T to create.
+		*/
+		__device__
+			device_vector(Allocator const& other, size_type const n)
+			: vector_base{ other, n }
+		{
+			default_fill(this->base.begin, this->base.end);
+		}
+
+		/**
+		*	Constructs a vector with a user specified number of objects, allocation policy and value.
+		*	@other - user specified allocator object.
+		*	@n - number of objects of type T to create.
+		*	@val - default value of created objects.
+		*/
+		__device__
+		device_vector(Allocator const& other, size_type const n, value_type const& val)
+			: vector_base{ other, n }
+		{
+			default_fill(this->base.begin, this->base.end, val);
+		}
+
+		/**
+		*	Creates a vector from an initializer list. 
+		*	@list - each object in the device vector is initialized to the corresponding value of the initializer list. 
+		*	NOTE: A temporary array will be created first, before the vector object is initialized. Can be expensive if @list is large. 
 		*/
 		__device__ 
-		device_vector(std::initializer_list<T> list)
+		device_vector(std::initializer_list<T> const list)
 			: vector_base{ list.size() }
 		{
 			cudlb::uninitialized_copy(list.begin(), list.end(), this->base.begin);
 		}
 
 		/**
-		*	Copy constructor. 
-		*	Takes another object and creates a copy, including allocation policy. 
+		*	Copy constructor.
+		*	@other - vector object to create a copy of. 
 		*/
 		__device__
 		device_vector(device_vector const& other)
-			: vector_base{ other::allocator, other.size() }
+			: vector_base{ other.size() }
 		{
 			cudlb::uninitialized_copy(other.begin(), other.end(), this->base.begin);
 		}
 
 		/**
 		*	Move constructor.
+		*	@other - if @other qualifies, it instantiates new vector object without the need for temporaries. 
 		*/
 		__device__ 
 		device_vector(device_vector && other)
@@ -198,18 +231,20 @@ namespace cudlb
 
 		/**
 		*	Copy assignment operator.
+		*	@other - vector object to create a copy of.
 		*/
 		__device__
-		device_vector const& operator=(device_vector const& other)
+		device_vector const& operator=(device_vector other)
 		{
-			
+			swap(*this, other);
 			return *this; 
 		}
 
 		/**
 		*	Move assingment operator. 
-		*	TODO add strong guarantee.
+		*	@other - if @other qualifies, it instantiates new vector object without the need for temporaries. 
 		*/
+		//TODO add strong guarantee. 
 		__device__ 
 		device_vector const& operator=(device_vector && other)
 		{
@@ -228,11 +263,12 @@ namespace cudlb
 		__device__
 		~device_vector()
 		{
-			destroy_elements();
+			destroy_elements(this->base.begin, this->base.end);
 		}
 
 		/** 
-		*	
+		*	Reserves space for a user specified number of objects of type T. 
+		*	@n - number of objects of type T to reserve space for. 
 		*/
 		__device__
 		void reserve(size_type const n)
@@ -281,43 +317,47 @@ namespace cudlb
 
 	private: 
 		/**
-		*	Fills the pre-allocated device vector space with a default value. 
+		*	Fills the pre-allocated vector space with a user specified value. 
+		*	@val - value to assign to all objects in the current vector. 
 		*	NOTE: This function constructs objects in the pre-allocated space. 
 		*/
 		__device__	
-		void default_fill(value_type const& value)
+		void default_fill(iterator start, iterator end, value_type const& val = value_type())
 		{
-			for (; this->base.begin != this->base.end; ++this->base.begin)
-				this->base.alloc.construct(this->base.begin, value);
+			for (; start != end; ++start)
+				this->base.alloc.construct(start, val);
 		}
 
 		/**
 		*	Calls each of the objects' destructors in the sequence.
-		*	If objects are pointers, then the objects pointed by the pointers are not cleaned up. 
-		*	You must manually delete them. 
+		*	If objects are pointers, then only the pointers (handles) are cleaned up. 
+		*	Objects pointed by the pointers must be deallocated manually. 
 		*/
 		__device__
-		void destroy_elements()
+		void destroy_elements(iterator begin, iterator end)
 		{
-			for (; this->base.begin != this->base.end; ++this->base.begin)
-				this->base.alloc.destroy(this->base.begin);
+			for (; begin != end; ++begin)
+				this->base.alloc.destroy(begin);
 		}
 
 
 		/**
 		*	Specialisation of the cudlb::swap function a vector_base
-		*	It swaps correctly the begin and space pointers, without affecting the end pointer
+		*	@first - first object to swap. 
+		*	@second - second object to swap. 
 		*/
 		__device__
-		void swap(vector_base & first, vector_base & second)
+		void swap(device_vector & first, device_vector & second)
 		{
 			using cudlb::swap;
 			swap(first.base.begin, second.base.begin);
+			swap(first.base.end, second.base.end);
 			swap(first.base.space, second.base.space);
 		}
 
 		/**
-		*	Shallow copy the elements from another device_vector object
+		*	Shallow copy the elements from another device_vector object.
+		*	@other - vector object to shallow copy from. 
 		*/
 		__device__
 		void impl_shallow_copy(device_vector & other)
@@ -326,7 +366,6 @@ namespace cudlb
 			this->base.end = other.base.end;
 			this->base.space = other.base.space;
 		}
-
 	};
 }
 

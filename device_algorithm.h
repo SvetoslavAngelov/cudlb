@@ -9,9 +9,9 @@ namespace cudlb
 	/**
 	*	Basic implementation of copy algorithm.
 	*	Copies elements from source container to destination.
-	*	iterator_first points to first element in source container.
-	*	iterator_last points to one past source container's last element.
-	*	destination is the destination array where the elements are copied to.
+	*	@iterator_first - points to first element in source container.
+	*	@iterator_last - points to one past source container's last element.
+	*	@destination - is the destination array where the elements are copied to.
 	*	NOTE: This function does NOT offer range checking.
 	*/
 	template<typename In, typename Out>
@@ -27,9 +27,9 @@ namespace cudlb
 	/**
 	*	Creates copies of source container elements into uninitialized empty space.
 	*	Unlike copy, this function must initialize new elements using placement new. 
-	*	iterator_first points to first element in source container
-	*	iterator_last points to one past source container's last element
-	*	result is the destination array where the elements are copied to
+	*	@iterator_first - points to first element in source container
+	*	@iterator_last - points to one past source container's last element
+	*	@destination - the destination array where the elements are copied to
 	*	NOTE: This function does NOT offer range checking.
 	*	TODO add strong guarantee to function
 	*/
@@ -46,7 +46,9 @@ namespace cudlb
 	}
 	
 	/**
-	*	Basic swap function implementation 
+	*	Basic swap function implementation. 
+	*	@first - first element to swap.
+	*	@second - second element to swap. 
 	*/
 	template<typename T> 
 	__host__ __device__

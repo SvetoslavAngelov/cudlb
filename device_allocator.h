@@ -38,13 +38,8 @@ namespace cudlb
 		~device_allocator() {}
 
 		/**
-		*	 Returns address of allocation.
-		*/
-		__device__
-		pointer address(reference r) { return &r; }
-
-		/**
-		*	 Returns read only address of allocation.
+		*	Returns read only address of allocation.
+		*	@r - object reference that we need the address of.	
 		*/
 		__device__
 		const_pointer address(const_reference r) { return &r; }
@@ -52,6 +47,7 @@ namespace cudlb
 
 		/**
 		*	Allocates space for n objects of type T.
+		*	@n - number of objects of type T. 
 		*/
 		__device__
 		pointer allocate(size_type const n)
@@ -61,6 +57,8 @@ namespace cudlb
 
 		/**
 		*	Deallocates space for n objects of type T.
+		*	@p - location of first element in a sequence. 
+		*	@n - number of objects of type T.
 		*/
 		__device__
 		void deallocate(pointer p, size_type n)
@@ -70,7 +68,9 @@ namespace cudlb
  		}
 
 		/**
-		*	Constructs an object T with value/s args in location p. 
+		*	Constructs an object with a specific value at set memory location. 
+		*	@p - memory location in which the new object should be constructed. 
+		*	@args - pack of values that are going to be used for the new object initialization. 
 		*	NOTE: object construction and destruction does not affect allocated space.
 		*/
 		template<typename... Arg>
@@ -81,8 +81,9 @@ namespace cudlb
 		}
 
 		/**
-		*	Destroys object T in p. 
-		*	NOTE: object construction and destruction does not affect allocated space.
+		*	Destroys an object at specified memory location. 
+		*	@p - memory location of object to be destroyed. 
+		*	NOTE: Object destruction does not deallocate memory space. 
 		*/
 		__device__
 		void destroy(pointer p)
