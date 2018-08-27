@@ -236,7 +236,7 @@ namespace cudlb
 		__device__
 		device_vector const& operator=(device_vector other)
 		{
-			swap(*this, other);
+			swap<device_vector<T, Allocator>>(*this, other);
 			return *this; 
 		}
 
@@ -273,10 +273,42 @@ namespace cudlb
 		__device__
 		void reserve(size_type const n)
 		{
-			if (this->base.space < n) 
+			if (capacity() < n) 
 			{
-				// TODO 
+				vector_base<T, Allocator> temp{ n };
+				cudlb::uninitialized_copy(this->base.begin, this->base.end, temp.base.begin);
+				temp.base.end = temp.base.begin + size();
+				destroy_elements(this->base.begin, this->base.end); 
+				swap<vector_base<T, Allocator>>(*this, temp);
 			}
+		}
+
+		/**
+		*	Adds a new element at the end of the vector sequence.  
+		*	@val - value to be added at the end of the sequence. 
+		*	This version of the function initializes the new element as a copy of @val.
+		*/
+		__device__
+		void push_back(value_type const& val)
+		{
+			if (capacity() == 0) reserve(1);
+			else if (capacity() == size()) reserve(expand(capacity()));
+			this->base.alloc.construct(this->base.end, val);
+			++this->base.end;
+		}
+
+		/**
+		*	Adds a new element at the end of the vector sequence.
+		*	@val - value to be added at the end of the sequence.
+		*	This version of the function moves @val into the new element. 
+		*/
+		__device__
+		void push_back(value_type && val)
+		{
+			if (capacity() == 0) reserve(1);
+			else if (capacity() == size()) reserve(expand(capacity()));
+			this->base.alloc.construct(this->base.end, val);
+			++this->base.end;
 		}
 
 		/**
@@ -298,6 +330,17 @@ namespace cudlb
 		}
 
 		/**
+		*	Checks if vector is empty. 
+		*/
+		__device__
+		bool empty() const
+		{
+			if (this->base.begin)
+				return false; 
+			return true; 
+		}
+
+		/**
 		*	Returns a constant iterator to the first object in the device vector sequence. 
 		*/
 		__device__
@@ -313,8 +356,65 @@ namespace cudlb
 		const_iterator end() const
 		{
 			return this->base.end;
-		}	 		
+		}	 
 
+		/**
+		*	Returns an iterator to first element in array
+		*/
+		__device__
+		const_iterator front() const
+		{
+			return this->base.begin;
+		}
+
+		/**
+		*	Returns an iterator to last element in array
+		*	NOTE: Calling this function on an empty container results in undefined behaviour. 
+		*/
+		__device__
+		const_iterator back() const
+		{
+			return this->base.end - 1; 
+		}
+
+		/**
+		*	Returns a reference to a an element from the array sequence. 
+		*	@n - position of element in sequence that we need a reference of.
+		*	NOTE: This function does is a range-checked alternative to the subscript operator[]
+		*/
+		__device__
+		const_reference at(size_type const n) const
+		{
+			if (size() <= n)	throw;
+			return this->base.begin[n];
+		}
+
+		/**
+		*	Operator overload functions.
+		*/
+
+		/**
+		*	Subscript operator. 
+		*	@n - position of element in sequence that we need a reference of. 
+		*	NOTE: This function does not offer range checking. For a range checked access use at(). 
+		*/
+		__device__
+		reference operator[](size_type const n)
+		{
+			return this->base.begin[n];
+		}
+
+		/**
+		*	Subscript operator.
+		*	@n - position of element in sequence that we need a reference of.
+		*	NOTE: This function does not offer range checking. For a range checked access use at().
+		*/
+		__device__
+		const_reference operator[](size_type const n) const
+		{
+			return this->base.begin[n];
+		}
+		
 	private: 
 		/**
 		*	Fills the pre-allocated vector space with a user specified value. 
@@ -340,14 +440,14 @@ namespace cudlb
 				this->base.alloc.destroy(begin);
 		}
 
-
 		/**
-		*	Specialisation of the cudlb::swap function a vector_base
+		*	Specialisation of the cudlb::swap function for a device_vector and its vector_base.
 		*	@first - first object to swap. 
 		*	@second - second object to swap. 
 		*/
+		template<typename vector_class>
 		__device__
-		void swap(device_vector & first, device_vector & second)
+		void swap(vector_class & first, vector_class & second)
 		{
 			using cudlb::swap;
 			swap(first.base.begin, second.base.begin);
@@ -366,6 +466,17 @@ namespace cudlb
 			this->base.end = other.base.end;
 			this->base.space = other.base.space;
 		}
+
+		/**
+		*	Calculates the expansion size for a new allocation. 
+		*	Returns the new allocation size. 
+		*	@capacity - current capacity of the vector. 
+		*	NOTE: Helper function, to be used exclusively with push_back().  
+		*/
+		__device__
+		size_type expand(size_type const capacity) const
+		{
+			return	capacity == 0 ? 2 : capacity + capacity / 2; // TODO This is another check, consider removing. 
+		}
 	};
 }
-
