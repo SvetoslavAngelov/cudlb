@@ -165,7 +165,7 @@ namespace cudlb
 		device_vector(size_type const n, value_type const& val)
 			: vector_base{ n }
 		{
-			default_fill(this->base.begin, this->base.end, val);
+			fill(this->base.begin, this->base.end, val);
 		}
 
 		/**
@@ -191,7 +191,7 @@ namespace cudlb
 		device_vector(Allocator const& other, size_type const n, value_type const& val)
 			: vector_base{ other, n }
 		{
-			default_fill(this->base.begin, this->base.end, val);
+			fill(this->base.begin, this->base.end, val);
 		}
 
 		/**
@@ -292,7 +292,7 @@ namespace cudlb
 		void push_back(value_type const& val)
 		{
 			if (capacity() == 0) reserve(1);
-			else if (capacity() == size()) reserve(expand(capacity()));
+			else if (capacity() == size()) reserve(expand());
 			this->base.alloc.construct(this->base.end, val);
 			++this->base.end;
 		}
@@ -306,7 +306,7 @@ namespace cudlb
 		void push_back(value_type && val)
 		{
 			if (capacity() == 0) reserve(1);
-			else if (capacity() == size()) reserve(expand(capacity()));
+			else if (capacity() == size()) reserve(expand());
 			this->base.alloc.construct(this->base.end, val);
 			++this->base.end;
 		}
@@ -378,6 +378,93 @@ namespace cudlb
 		}
 
 		/**
+		*	Returns a const iterator to the element array.
+		*/
+		__device__
+		iterator data()
+		{
+			return this->base.begin;
+		}
+
+		/**
+		*	Returns a const iterator to the element array.
+		*/
+		__device__
+		const_iterator data() const
+		{
+			return this->base.begin; 
+		}
+
+		/**
+		*	Reduces vector capacity to match its size.  
+		*	Uninitialized memory space previously reserved gets released back to the system. 
+		*/
+		__device__
+		void shrink_to_fit()
+		{
+			if (size() < capacity())
+			{
+				auto dealloc_size = capacity() - size(); 
+				this->base.alloc.deallocate(this->base.end, dealloc_size);
+				this->base.space = this->base.end;
+			}
+		}
+
+		/**
+		*	Clears the contents of the the vector. 
+		*	NOTE: Allocated vector space @capacity(), remains unchanged.
+		*	NOTE: Trying to access begin() after a call to this function is undefined behaviour.
+		*/
+		__device__
+		void clear()
+		{
+			destroy_elements(this->base.begin, this->base.end);
+			this->base.end = this->base.begin; 
+		}
+
+		/**
+		*	Erases an element from the vector at specified location.
+		*	@pos - Position of element to be erased.
+		*	NOTE: Allocated vector space @capacity(), remains unchanged.
+		*/
+		__device__
+		const_iterator erase(iterator pos)
+		{
+			auto result = pos;
+			for (; pos != end(); ++pos)
+				*pos = *(pos + 1);
+
+			--this->base.end;
+			this->base.alloc.destroy(this->base.end);
+			return result;
+		}
+
+		/**
+		*	Erases elements in the range [first : last)
+		*	@first - Start of the range.
+		*	@last - End of the range.
+		*	NOTE: Allocated vector space @capacity(), remains unchanged.
+		*/
+		__device__
+		const_iterator erase(iterator first, iterator last)
+		{
+			auto result = first;
+			if (first != last)
+			{
+				auto range_size = static_cast<size_type>(last - first);
+				for (; first != end(); ++first)
+					*first = *(first + range_size);
+
+				for (auto i = range_size; i != 0; --i)
+				{
+					--this->base.end;
+					this->base.alloc.destroy(this->base.end);
+				}
+			}
+			return result;
+		}
+
+		/**
 		*	Returns a reference to a an element from the array sequence. 
 		*	@n - position of element in sequence that we need a reference of.
 		*	NOTE: This function does is a range-checked alternative to the subscript operator[]
@@ -417,12 +504,27 @@ namespace cudlb
 		
 	private: 
 		/**
-		*	Fills the pre-allocated vector space with a user specified value. 
-		*	@val - value to assign to all objects in the current vector. 
+		*	Fills the pre-allocated vector space with default object value.  
+		*	@start - beginning of the vector element sequence.
+		*	@end - one past the end of the vector element sequence. 
 		*	NOTE: This function constructs objects in the pre-allocated space. 
 		*/
 		__device__	
-		void default_fill(iterator start, iterator end, value_type const& val = value_type())
+		void default_fill(iterator start, iterator end)
+		{
+			for (; start != end; ++start)
+				this->base.alloc.construct(start);
+		}
+
+		/**
+		*	Fills the pre-allocated vector space with a user specified value.
+		*	@start - beginning of the vector element sequence.
+		*	@end - one past the end of the vector element sequence. 
+		*	@val - value to assign to all objects in the current vector. 
+		*	NOTE: This function constructs objects in the pre-allocated space.
+		*/
+		__device__
+		void fill(iterator start, iterator end, value_type const& val)
 		{
 			for (; start != end; ++start)
 				this->base.alloc.construct(start, val);
@@ -470,13 +572,12 @@ namespace cudlb
 		/**
 		*	Calculates the expansion size for a new allocation. 
 		*	Returns the new allocation size. 
-		*	@capacity - current capacity of the vector. 
 		*	NOTE: Helper function, to be used exclusively with push_back().  
 		*/
 		__device__
-		size_type expand(size_type const capacity) const
+		size_type expand() const
 		{
-			return	capacity == 0 ? 2 : capacity + capacity / 2; // TODO This is another check, consider removing. 
+			return	1 + capacity() + capacity() / 2;
 		}
 	};
 }
