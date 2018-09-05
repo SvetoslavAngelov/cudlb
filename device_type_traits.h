@@ -11,6 +11,13 @@ namespace cudlb
 	struct iterator_traits {
 		using value_type = T; 
 		using pointer = T*;
+		using size_type = size_t; 
+
+		__device__
+		static size_type distance(T begin, T end)
+		{
+			return static_cast<size_type>(end - begin);
+		}
 	};
 
 	// Pointer template specialization of iterator_traits class.
@@ -18,6 +25,13 @@ namespace cudlb
 	struct iterator_traits<T*> {
 		using value_type = T; 
 		using pointer = T*;
+		using size_type = size_t;
+
+		__device__
+		static size_type distance(T begin, T end)
+		{
+			return static_cast<size_type>(end - begin);
+		}
 	};
 
 	/**

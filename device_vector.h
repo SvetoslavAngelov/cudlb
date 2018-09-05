@@ -286,7 +286,6 @@ namespace cudlb
 		/**
 		*	Adds a new element at the end of the vector sequence.  
 		*	@val - value to be added at the end of the sequence. 
-		*	This version of the function initializes the new element as a copy of @val.
 		*/
 		__device__
 		void push_back(value_type const& val)
@@ -299,16 +298,18 @@ namespace cudlb
 
 		/**
 		*	Adds a new element at the end of the vector sequence.
-		*	@val - value to be added at the end of the sequence.
-		*	This version of the function moves @val into the new element. 
+		*	@arg - arguments to be forwarded to the object constructor. 
 		*/
+		template<typename... Arg> 
 		__device__
-		void push_back(value_type && val)
+		reference emplace_back(Arg &&... arg)
 		{
 			if (capacity() == 0) reserve(1);
 			else if (capacity() == size()) reserve(expand());
-			this->base.alloc.construct(this->base.end, val);
+			this->base.alloc.construct(this->base.end, arg...);
+			auto result = this->base.end;
 			++this->base.end;
+			return *result;
 		}
 
 		/**
@@ -501,7 +502,7 @@ namespace cudlb
 		{
 			return this->base.begin[n];
 		}
-		
+	
 	private: 
 		/**
 		*	Fills the pre-allocated vector space with default object value.  
@@ -580,4 +581,49 @@ namespace cudlb
 			return	1 + capacity() + capacity() / 2;
 		}
 	};
+
+	/**
+	*	Operator overloads for device_vector - ==, !=, <, >, <=, >=.
+	*/
+	template<typename T, typename Allocator>
+	__device__
+	bool operator==(device_vector<T, Allocator> const& rhs, device_vector<T, Allocator> const& lhs)
+	{
+		return cudlb::equal(rhs.begin(), rhs.end(), lhs.begin(), lhs.end());
+	}
+
+	template<typename T, typename Allocator>
+	__device__
+	bool operator!=(device_vector<T, Allocator> const& rhs, device_vector<T, Allocator> const& lhs)
+	{
+		return !(rhs == lhs);
+	}
+
+	template<typename T, typename Allocator>
+	__device__
+	bool operator<(device_vector<T, Allocator> const& rhs, device_vector<T, Allocator> const& lhs)
+	{
+		return cudlb::lexicographical_compare(rhs.begin(), rhs.end(), lhs.begin(), lhs.end());
+	}
+
+	template<typename T, typename Allocator>
+	__device__
+	bool operator>(device_vector<T, Allocator> const& rhs, device_vector<T, Allocator> const& lhs)
+	{
+		return lhs < rhs;
+	}
+
+	template<typename T, typename Allocator>
+	__device__
+	bool operator<=(device_vector<T, Allocator> const& rhs, device_vector<T, Allocator> const& lhs)
+	{
+		return !(rhs > lhs);
+	}
+
+	template<typename T, typename Allocator>
+	__device__
+	bool operator>=(device_vector<T, Allocator> const& rhs, device_vector<T, Allocator> const& lhs)
+	{
+		return !(rhs < lhs);
+	}
 }
