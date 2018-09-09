@@ -466,9 +466,9 @@ namespace cudlb
 		}
 
 		/**
-		*	Returns a reference to a an element from the array sequence. 
+		*	Returns a reference to an element from the array sequence. 
 		*	@n - position of element in sequence that we need a reference of.
-		*	NOTE: This function does is a range-checked alternative to the subscript operator[]
+		*	NOTE: This function is a range-checked alternative to the subscript operator[]
 		*/
 		__device__
 		const_reference at(size_type const n) const
@@ -573,7 +573,7 @@ namespace cudlb
 		/**
 		*	Calculates the expansion size for a new allocation. 
 		*	Returns the new allocation size. 
-		*	NOTE: Helper function, to be used exclusively with push_back().  
+		*	NOTE: Helper function, to be used exclusively with push_back() and emplace_back().  
 		*/
 		__device__
 		size_type expand() const
