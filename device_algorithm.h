@@ -101,4 +101,19 @@ namespace cudlb
 		}
 		return false;
 	}
+
+	/**
+	*	Looks for an element with a given value in a range [first, last).
+	*	@[first : last) - range of elements to look for the element
+	*	@val - element value to look for.
+	*	Returns an iterator to the element if found, otherwise returns last element in the range. 
+	*/
+	template<typename Iterator, typename T> 
+	__host__ __device__
+	Iterator find(Iterator first, Iterator last, T const& value)
+	{
+		for (; first != last; ++first)
+			if (*first == val) return first; 
+		return last; 
+	}
 }
