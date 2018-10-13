@@ -36,4 +36,15 @@ namespace cudlb
 	{
 		return static_cast<T&&>(arg);
 	}
+
+	/**
+	*	Returns address of an object, even if operator "&" is overloaded. 
+	*	&obj - the object we seek the address of. 
+	*/
+	template<typename T> 
+	__device__
+	T* address_of(T& obj)
+	{
+		return reinterpret_cast<T*>(&reinterpret_cast<char&>(obj));
+	}
 }

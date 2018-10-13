@@ -38,7 +38,9 @@ namespace cudlb
 			explicit vector_impl(Allocator const& other)
 				: alloc{ other }, begin{ nullptr }, end{ nullptr }, space{ nullptr } {}
 
-
+			/**
+			*	Data members
+			*/
 			Allocator alloc; // Memory allocator object.
 			iterator begin;	// Beginning of array of elements. 
 			iterator end;	// One past the last initialized element in the array. 
