@@ -39,12 +39,12 @@ namespace cudlb
 
 	/**
 	*	Returns address of an object, even if operator "&" is overloaded. 
-	*	&obj - the object we seek the address of. 
+	*	@obj - the object we seek the address of. 
 	*/
 	template<typename T> 
 	__device__
 	T* address_of(T& obj)
 	{
-		return reinterpret_cast<T*>(&reinterpret_cast<char&>(obj));
+		return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<char const volatile&>(obj)));
 	}
 }
