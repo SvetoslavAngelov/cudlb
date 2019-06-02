@@ -50,7 +50,7 @@ namespace cudlb
 		*	@n - number of objects of type T. 
 		*/
 		__device__
-		pointer allocate(size_type const n)
+		pointer allocate(size_type const n = 1)
 		{
 			return reinterpret_cast<pointer>(::operator new(n * sizeof(value_type)));
 		}
@@ -61,7 +61,7 @@ namespace cudlb
 		*	@n - number of objects of type T.
 		*/
 		__device__
-		void deallocate(pointer p, size_type n)
+		void deallocate(pointer p, size_type n = 1)
 		{
 			if(p)
 				::operator delete(p, (n * sizeof(value_type)));

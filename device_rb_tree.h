@@ -1,332 +1,471 @@
 #pragma once
 #include "device_utility.h"
 #include "device_allocator.h"
+#include "device_type_traits.h"
 
 namespace cudlb 
 {
-	enum class rb_tree_colour { 
-		red = false, black = true 
+	enum class rb_tree_colour {
+		black, red
 	};
 
 	template<typename T> 
 	struct rb_tree_node {
-
-		using node_pointer = rb_tree_node*; 
-		using const_node_pointer = rb_tree_node const*; 
+		using node = rb_tree_node;
+		using value = T; 
 		
-		using value_type = T; 
-		using pointer = T*; 
-		using const_pointer = T const*;
-
-		/**
-		*	Constructor
-		*	@parent - Parent node. 
-		*	@left - Left tree brach, or if this node is the root, the minimum value in the tree. 
-		*	@right - Right tree branch, or if this node is the root, the maximum value in the tree. 
-		*	@val - Key value. 
-		*	@is_root - true if creating the root node
-		*	@colour - Black if root, all leaves are also black. If node is black its children are red.
-		*/
 		__device__
-		rb_tree_node(node_pointer parent, node_pointer left, node_pointer right, T const& val, bool is_root, rb_tree_colour colour = rb_tree_colour::black)
-			: parent{ parent }, left{ left }, right{ right }, val{ val }, is_root{ is_root }, colour{ colour }
-		{
-		}
-
-		/**
-		*	Access the leftmost node in the red-black tree, which is also the smallest element in the sequence, or min. 
-		*	@node - starting node.
-		*	Returns leftmost (minimum) node in the red-black tree, or root.
-		*/
-		__device__ 
-		node_pointer minimum(node_pointer node)
-		{
-			if (node->is_root) // if this is the root node, find and return the leftmost node (minimum)
-			{
-				while (node->left)
-				{
-					node = node->left;
-				}
-				return node; 
-			}
-			else	// if the node is not a root node, find the root and call this function recursively with it
-			{
-				while (node->parent)
-				{
-					node = node->parent;
-				}
-				return minimum(node);
-			}
-		}
-
-		/**
-		*	Access the leftmost node in the red-black tree, which is also the smallest element in the sequence, or min. 
-		*	@c_node - starting node.
-		*	Returns rightmost (maxium) node in the red-black tree, or root.
-		*/
-		__device__
-		const_node_pointer minimum(const_node_pointer c_node)
-		{
-			if (c_node->is_root)	// if this is the root node, find and return the leftmost node (minimum)
-			{
-				while (c_node->left)
-				{
-					c_node = c_node->left; 
-				}
-				return c_node;
-			}
-			else	// if the node is not a root node, find the root and call this function recursively with it
-			{
-				while (c_node->parent)
-				{
-					c_node = c_node->parent; 
-				}
-				return minimum(c_node);
-			}
-		}
-
-		/**
-		*	Access the rightmost node in the red-black tree, which is also the largest element in the sequence, or max. 
-		*	@node - starting node. 
-		*	Returns rightmost (maxium) node in the red-black tree, or root.
-		*/
-		__device__
-		node_pointer maximum(node_pointer node)
-		{
-			if (node->is_root) // if this is the root node, find and return the rightmost node (maximum)
-			{
-				while (node->right)
-				{
-					node = node->right;
-				}
-				return node; 
-			}
-			else	// if the node is not a root node, find the root and call this function recursively with it
-			{
-				while (node->parent)
-				{
-					node = node->parent; 
-				}
-				return maximum(node);
-			}
-		}
-
-		/**
-		*	Access the rightmost node in the red-black tree, which is also the largest element in the sequence, or max. 
-		*	@c_node - starting node.
-		*	Returns rightmost (maxium) node in the red-black tree, or root.
-		*/
-		__device__
-		const_node_pointer maximum(const_node_pointer c_node)
-		{
-			if (c_node->is_root) // if this is the root node, find the rightmost node (maximum)
-			{
-				while (c_node->right)
-				{
-					c_node = c_node->right;
-				}
-				return c_node; 
-			}
-			else // if the node is not a root node, find the root and call this function recursively with it
-			{
-				while (c_node->parent)
-				{
-					c_node = c_node->parent;
-				}
-				return maximum(c_node);
-			}
-		}
-
-		/**
-		*	Access the leftmost node from a selected tree branch.
-		*	@node - starting node.
-		*	Returns the leftmost node from the selected branch, or the branch head if no local min.
-		*/
-		__device__
-		node_pointer local_minimum(node_pointer node)
-		{
-			while (node->left)
-			{
-				node = node->left;
-			}
-			return node;
-		}
-
-		/**
-		*	Access the leftmost node from a selected tree branch.
-		*	@c_node - starting node.
-		*	Returns the leftmost node from the selected branch, or the branch head if no local min.
-		*/
-		__device__
-		const_node_pointer local_minimum(const_node_pointer c_node)
-		{
-			while (c_node->left)
-			{
-				c_node = c_node->left; 
-			}
-			return c_node;
-		}
-
-		/**
-		*	Access the rightmost node from a selected tree branch. 
-		*	@node - starting node.
-		*	Returns the rightmost node from the selected branch, or the branch head if no local max. 
-		*/
-		__device__
-		node_pointer local_maximum(node_pointer node)
-		{
-			while (node->right)
-			{
-				node = node->right;
-			}
-			return node;
-		}
-
-		/**
-		*	Access the rightmost node from a selected tree branch.
-		*	@c_node - starting node.
-		*	Returns the rightmost node from the selected branch, or the branch head if no local max.
-		*/
-		__device__
-		const_node_pointer local_maximum(const_node_pointer c_node)
-		{
-			while (c_node->right)
-			{
-				c_node = c_node->right;
-			}
-			return c_node;
-		}
-
-		/**
-		*	Returns the address of the object in this node.
-		*	Uses cudlb::address_of() in case the value type operator "&" is overloaded. 
-		*/
-		__device__
-		const_pointer const_value_address() const
-		{
-			return cudlb::address_of(val);
-		}
-
-		/**
-		*	Returns the address of the object in this node.
-		*	Uses cudlb::address_of() in case the value type operator "&" is overloaded.
-		*/
-		__device__
-		pointer value_address()
-		{
-			return cudlb::address_of(val);
-		}
-		
-		node_pointer parent;	//	Parent node, or if this node is the root, null. 
-		node_pointer left;		//	Left brach of tree, or if this node is the root, the minimum value in the tree. 
-		node_pointer right;		//	Right branch of tree, or if this node is the root, the maximum value in the tree. 
-		value_type val;			//	Key value.
-		bool is_root;			//  True if this is the root node of the rb_tree
-		rb_tree_colour colour;	//	Black if root, all leaves are also black. If node is black its children are red. 
-		
-	};
-
-	template<typename T> 
-	class rb_tree {
-	public:
-		struct iterator;
-		struct const_iterator;
-
-		// TODO
-	};
-
-	template<typename T> 
-	struct rb_tree<T>::const_iterator {
-
-		using const_node_pointer = rb_tree_node<T> const*;
-		using value_type = T; 
-		using const_reference = T const&;
-		using const_pointer = T const*;
-
-		/**
-		*	Default constructor. 
-		*/
-		__device__
-		const_iterator(const_node_pointer np) 
-			: node{ np }
+		rb_tree_node()
+			: val{ value() }, parent{ nullptr }, left{ nullptr }, right{ nullptr }, colour{ rb_tree_colour::black }
 		{}
 
-		/**
-		*	Inorder increment.
-		*/
 		__device__
-		const_iterator& operator++() 
+		explicit rb_tree_node(value const& val)
+			: val{ val }, parent{ nullptr }, left{ nullptr }, right{ nullptr }, colour{ rb_tree_colour::black }
+		{}
+
+		__device__
+		node* min(node* nd)
 		{
-			if (node == node->maximum(node));	// If this is the last node in the tree, then do nothing. 
-			else if (node->right)	// If there is a right subtree, then find its lowest key value. 
+			while (nd->left)
 			{
-				node = node->local_minimum(node->right);
+				nd = nd->left;
 			}
-			else if (node->parent)	// If there isn't, start climbing up the tree, until a parent node with a right subtree is found. 
+			return nd; 
+		}
+
+		__device__
+		node* max(node* nd)
+		{
+			while (nd->right)
 			{
-				node = node->parent; 
-				for (; node->parent && node->parent->right;)
+				nd = nd->right;
+			}
+			return nd; 
+		}
+
+		value val; 
+		node* parent; 
+		node* left; 
+		node* right; 
+		rb_tree_colour colour; 
+	};
+
+	template<typename T, typename Comp = cudlb::less<T>, typename Allocator = cudlb::device_allocator<rb_tree_node<T>>>
+	class rb_tree {
+	public:
+		using node = rb_tree_node<T>;
+		using value = T;
+		
+		struct iterator; 
+		struct const_iterator;
+
+		struct rb_tree_impl {
+
+			__device__
+			rb_tree_impl()
+				: root{ nullptr }, begin{ nullptr }, end{ nullptr }
+			{
+			}
+
+			__device__
+			rb_tree_impl(Comp const& c_other, Allocator const& a_other)
+				: comp{ c_other }, alloc{ a_other }, root{ nullptr }, begin{ nullptr }, end{ nullptr }
+			{
+			}
+
+			Comp comp;
+			Allocator alloc;
+			node* root;
+			node* begin; 
+			node* end;
+		};
+
+		__device__
+		rb_tree()
+			: impl{}
+		{
+		}
+
+		__device__
+		explicit rb_tree(Comp const& c_other, Allocator const& a_other = Allocator())
+			: impl{ c_other, a_other }
+		{
+		}
+
+		__device__
+		explicit rb_tree(value const& val)
+			: impl{}
+		{
+			impl.root = impl.begin = impl.alloc.allocate();
+			impl.alloc.construct(impl.root, val);
+		}
+
+		__device__ 
+		void insert(node* z)
+		{
+			node* y = impl.end;
+			node* x = impl.root;
+
+			while (x != impl.end)
+			{
+				y = x; 
+				if (impl.comp(z->val, x->val))
 				{
-					node = node->parent;
+					x = x->left;
 				}
+				else
+				{
+					x = x->right;
+				}
+			}
+			z->parent = y; 
+			if (y == impl.end)
+			{
+				impl.root = z; 
+			}
+			else if (impl.comp(z->val, y->val))
+			{
+				y->left = z; 
+			}
+			else
+			{
+				y->right = z; 
+			}
+			z->left = impl.end; 
+			z->right = impl.end; 
+			z->colour = rb_tree_colour::red;
+			insert_fixup(z);
+		}
+
+		__device__
+		void remove(node* z)
+		{
+			node* x = impl.end;
+			node* y = z; 
+			rb_tree_colour y_temp = y->colour;
+			if (z->left == impl.end)
+			{
+				x = z->right; 
+				transplant(z, z->right);
+			}
+			else if (z->right == impl.end)
+			{
+				x = z->left;
+				transplant(z, z->left);
+			}
+			else
+			{
+				y = impl.root->min(z->right);
+				y_temp = y->colour;
+				x = y->right;
+				if (y->parent == z)
+				{
+					x->parent = y; 
+				}
+				else
+				{
+					transplant(y, y->right);
+					y->right = z->right; 
+					y->right->parent = y;
+				}
+				transplant(z, y);
+				y->left = z->left; 
+				y->left->parent = y;
+				y->colour = z->colour;
+			}
+			if (y_temp == rb_tree_colour::black)
+			{
+				remove_fixup(x);
+			}
+		}
+
+		__device__
+			void transplant(node* x, node* y)
+		{
+			if (x->parent == impl.end)
+			{
+				impl.root = y;
+			}
+			else if (x == x->parent->left)
+			{
+				x->parent->left = y;
+			}
+			else
+			{
+				x->parent->right = y;
+			}
+			y->parent = x->parent;
+		}
+
+		__device__
+		void remove_fixup(node* x)
+		{
+			while (x != impl.end && x->colour == rb_tree_colour::black)
+			{
+				if (x == x->parent->left)
+				{
+					node* y = x->parent->right;
+					if (y->colour == rb_tree_colour::red)
+					{
+						y->colour = rb_tree_colour::black;
+						x->parent->colour = rb_tree_colour::red;
+						left_rotate(x->parent);
+						y = x->parent->right;
+					}
+					if (y->left->colour == rb_tree_colour::black && y->right->colour == rb_tree_colour::black)
+					{
+						y->colour = rb_tree_colour::red;
+						x = x->parent;
+					}
+					else if (y->right->colour == rb_tree_colour::black)
+					{
+						y->left->colour = rb_tree_colour::black;
+						y->colour = rb_tree_colour::red;
+						right_rotate(y);
+						y = x->parent->right;
+					}
+					y->colour = x->parent->colour; 
+					x->parent->colour = rb_tree_colour::black;
+					y->right->colour = rb_tree_colour::black;
+					left_rotate(x->parent);
+					x = impl.root;
+				}
+				else
+				{
+					node* y = x->parent->left;
+					if (y->colour == rb_tree_colour::red)
+					{
+						y->colour = rb_tree_colour::black;
+						x->parent->colour = rb_tree_colour::red;
+						left_rotate(x->parent);
+						y = x->parent->left;
+					}
+					if (y->right->colour == rb_tree_colour::black && y->left->colour == rb_tree_colour::black)
+					{
+						y->colour = rb_tree_colour::red;
+						x = x->parent;
+					}
+					else if (y->left->colour == rb_tree_colour::black)
+					{
+						y->right->colour = rb_tree_colour::black;
+						y->colour = rb_tree_colour::red;
+						right_rotate(y);
+						y = x->parent->left;
+					}
+					y->colour = x->parent->colour;
+					x->parent->colour = rb_tree_colour::black;
+					y->left->colour = rb_tree_colour::black;
+					left_rotate(x->parent);
+					x = impl.root;
+				}
+			}
+			x->colour = rb_tree_colour::black;
+		}
+
+		__device__
+		void insert_fixup(node* z)
+		{
+			while (z->parent->colour == rb_tree_colour::red)
+			{
+				if (z->parent == z->parent->parent->left)
+				{
+					node* y = z->parent->parent->right;
+					if (y->colour == rb_tree_colour::red)
+					{
+						z->parent->colour = rb_tree_colour::black;
+						y->colour = rb_tree_colour::black;
+						z->parent->parent->colour = rb_tree_colour::red;
+						z = z->parent->parent;
+					}
+					else if (z == z->parent->right)
+					{
+						z = z->parent;
+						left_rotate(z);
+					}
+					z->parent->colour = rb_tree_colour::black;
+					z->parent->parent->colour = rb_tree_colour::red;
+					right_rotate(z->parent->parent);
+				}
+				else 
+				{
+					node* y = z->parent->parent->left;
+					if (y->colour == rb_tree_colour::red)
+					{
+						z->parent->colour = rb_tree_colour::black;
+						y->colour = rb_tree_colour::black;
+						z->parent->parent->colour = rb_tree_colour::red;
+						z = z->parent->parent;
+					}
+					else if (z == z->parent->left)
+					{
+						z = z->parent;
+						left_rotate(z);
+					}
+					z->parent->colour = rb_tree_colour::black;
+					z->parent->parent->colour = rb_tree_colour::red;
+					right_rotate(z->parent->parent);
+				}
+			}
+			impl.root->colour = rb_tree_colour::black;
+		}
+
+		__device__
+		void left_rotate(node* x)
+		{
+			if (x->right != impl.end)
+			{
+				node* y = x->right;
+				x->right = y->left;
+				if (y->left != impl.end)
+				{
+					y->left->parent = x;
+				}
+				y->parent = x->parent;
+				if (x->parent == impl.end)
+				{
+					impl.root = y;
+
+				}
+				else if (x == x->parent->left)
+				{
+					x->parent->left = y;
+				}
+				else
+				{
+					x->parent->right = y;
+				}
+				y->left = x;
+				x->parent = y;
+			}
+		}
+
+		__device__
+		void right_rotate(node* y)
+		{
+			if (y->left != impl.end)
+			{
+				node* x = y->left;
+				y->left = x->right; 
+				if (x->right != impl.end)
+				{
+					x->right->parent = y;
+				}
+				x->parent = y->parent;
+				if (y == impl.end)
+				{
+					impl.root = x;
+				}
+				else if (y == y->parent->left)
+				{
+					y->parent->left = x;
+				}
+				else
+				{
+					y->parent->right = x; 
+				}
+				x->right = y; 
+				y->parent = x;
+			}
+		}
+
+		__device__
+		bool empty() const
+		{
+			return impl.begin == impl.end;
+		}
+
+		__device__
+		iterator begin() const
+		{
+			return iterator{ impl.begin };
+		}
+
+		__device__
+		iterator end() const
+		{
+			return iterator{ impl.end };
+		}
+
+		__device__
+		~rb_tree()
+		{
+			delete_tree();
+		}
+
+	private:
+		__device__ 
+		void delete_tree()
+		{
+			if (!empty())
+			{
+				node* x = impl.begin;
+				while (x != impl.end)
+				{
+					impl.alloc.destroy(x);
+					impl.alloc.deallocate(x);
+					++x;
+				}
+				impl.root = impl.begin = impl.end = nullptr;
+			}
+		}
+
+		rb_tree_impl impl;
+	};
+
+	template<typename T, typename Comp, typename Allocator> 
+	struct rb_tree<T, Comp, Allocator>::iterator {
+		using node = rb_tree_node<T>;
+
+		__device__
+		explicit iterator(cudlb::nullptr_t)
+			: nd{ nullptr }
+		{}
+
+		__device__
+		explicit iterator(node* nd)
+			: nd{ nd }
+		{}
+
+		__device__
+		iterator& operator++()
+		{
+			if (nd->right)
+			{
+				nd = nd->right; 
+				while (nd->left)
+				{
+					nd = nd->left; 
+				}
+			}
+			else
+			{
+				node* p = nd->parent; 
+				while (p && nd == p->right)
+				{
+					nd = p; 
+					p = p->parent;
+				}
+				nd = p;
 			}
 			return *this;
 		}
 
-		/*
-		*	Inorder decrement. 
-		*/
 		__device__
-		const_iterator& operator--() 
-		{ 
-			if (node == node->minimum(node)); // if this is the first node in the tree, then do nothing. 
-			else if (node->left) // If there is a left subtree, then find its maximum key value. 
-			{
-				node = node->local_maximum(node->left);
-			}
-			else if (node->parent) // If there isn't, start climbing up the tree, until a parent node with a left subtree is found.
-			{
-				node = node->parent;
-				for (; node->parent && node->parent->left;)
-				{
-					node = node->parent;
-				}
-			}
-			return *this; 
+		iterator& operator--()
+		{
+			// TODO
+			return *this;
 		}
 
-		__device__
-		const_reference operator*() { return *node->const_value_address(); }
-
-		__device__
-		const_pointer operator->() { return node->const_value_address(); }
-
-		__device__
-		bool operator==(const_iterator b) const { return this == b; }
-
-		__device__
-		bool operator!=(const_iterator b) const { return !(this == b); }
-
-
-		/**
-		*	Data members
-		*/
-		const_node_pointer node; 
+		node* nd;
 	};
 
-	template<typename T> 
-	__device__
-	bool operator==(rb_tree_node<T> const& a, rb_tree_node<T> const& b)
-	{
-		return a.val == b.val;
-	}
+	template<typename T, typename Comp, typename Allocator>
+	struct rb_tree<T, Comp, Allocator>::const_iterator {
 
-	template<typename T> 
-	__device__
-	bool operator!=(rb_tree_node<T> const& a, rb_tree_node<T> const& b)
-	{
-		return !(a == b);
-	}
+	};
+
 }
 
 

@@ -59,4 +59,23 @@ namespace cudlb
 	struct remove_reference<T&&> {
 		using value_type = T; 
 	};
+
+	/**
+	*	Function object for performing comparisons.
+	*	True if lhs < rhs.
+	*/
+	template<typename T>
+	struct less {
+		__device__
+		bool constexpr operator()(T const& lhs, T const& rhs) const
+		{
+			return lhs < rhs;
+		}
+	};
+
+	/**
+	*	Type of the null pointer literal nullptr.
+	*	Required for function and constructor declarations which can explicitly take nullptr as parameter.
+	*/
+	typedef decltype(nullptr) nullptr_t;
 }
